@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Upload } from "lucide-react";
 import heroImage from "@/assets/hero-comparison.jpg";
+import heroLaptopImage from "@/assets/hero-laptop-comparison.jpg";
 
 export const Hero = () => {
   return (
@@ -45,23 +46,46 @@ export const Hero = () => {
             </Button>
           </div>
           
-          {/* Hero Image */}
-          <div className="relative max-w-4xl mx-auto">
-            <div className="relative rounded-2xl overflow-hidden shadow-card border border-border/40 bg-card backdrop-blur-sm">
-              <img 
-                src={heroImage} 
-                alt="Before and after comparison showing AI transformation" 
-                className="w-full h-auto"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
+          {/* Hero Images - Two examples */}
+          <div className="space-y-8 max-w-5xl mx-auto">
+            {/* First Example */}
+            <div className="relative">
+              <div className="relative rounded-2xl overflow-hidden shadow-card border border-border/40 bg-card backdrop-blur-sm">
+                <img 
+                  src={heroImage} 
+                  alt="Character transformation from photo to Ghibli anime style" 
+                  className="w-full h-auto"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
+              </div>
+              
+              {/* Floating cards for first example */}
+              <div className="absolute -top-4 -left-4 bg-card border border-border rounded-lg p-3 shadow-card animate-glow-pulse hidden lg:block">
+                <div className="text-sm font-medium text-foreground">Original Photo</div>
+              </div>
+              <div className="absolute -top-4 -right-4 bg-card border border-border rounded-lg p-3 shadow-card animate-glow-pulse hidden lg:block">
+                <div className="text-sm font-medium text-foreground">Ghibli Style</div>
+              </div>
             </div>
-            
-            {/* Floating cards */}
-            <div className="absolute -top-4 -left-4 bg-card border border-border rounded-lg p-3 shadow-card animate-glow-pulse hidden lg:block">
-              <div className="text-sm font-medium text-foreground">Original Photo</div>
-            </div>
-            <div className="absolute -top-4 -right-4 bg-card border border-border rounded-lg p-3 shadow-card animate-glow-pulse hidden lg:block">
-              <div className="text-sm font-medium text-foreground">Ghibli Style</div>
+
+            {/* Second Example */}
+            <div className="relative">
+              <div className="relative rounded-2xl overflow-hidden shadow-card border border-border/40 bg-card backdrop-blur-sm">
+                <img 
+                  src={heroLaptopImage} 
+                  alt="Woman with laptop transformation from photo to Ghibli anime style" 
+                  className="w-full h-auto"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent" />
+              </div>
+              
+              {/* Floating cards for second example */}
+              <div className="absolute -top-4 -left-4 bg-card border border-border rounded-lg p-3 shadow-card animate-glow-pulse hidden lg:block">
+                <div className="text-sm font-medium text-foreground">Real Photo</div>
+              </div>
+              <div className="absolute -top-4 -right-4 bg-card border border-border rounded-lg p-3 shadow-card animate-glow-pulse hidden lg:block">
+                <div className="text-sm font-medium text-foreground">Anime Art</div>
+              </div>
             </div>
           </div>
         </div>
