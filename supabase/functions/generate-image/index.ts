@@ -22,19 +22,35 @@ serve(async (req) => {
       throw new Error("OpenAI API key not configured");
     }
 
+    // Validate size based on model
+    let validatedSize = size;
+    if (model === "dall-e-2") {
+      // DALL-E 2 only supports square sizes
+      const validSizes = ["256x256", "512x512", "1024x1024"];
+      if (!validSizes.includes(size)) {
+        validatedSize = "1024x1024"; // Default to square for DALL-E 2
+      }
+    }
+
+    const requestBody: any = {
+      model,
+      prompt,
+      n,
+      size: validatedSize,
+    };
+
+    // Only add quality for DALL-E 3
+    if (model === "dall-e-3") {
+      requestBody.quality = quality;
+    }
+
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${openaiApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        prompt,
-        n,
-        size,
-        quality: model === "dall-e-3" ? quality : undefined,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
