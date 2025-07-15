@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Upload, Sparkles, Edit3, AlertTriangle } from "lucide-react";
+import { Loader2, Upload, Sparkles, Edit3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export const ImageGenerator = () => {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openai_api_key') || '');
   const [prompt, setPrompt] = useState('');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -22,26 +20,7 @@ export const ImageGenerator = () => {
   const [quality, setQuality] = useState('standard');
   const { toast } = useToast();
 
-  const saveApiKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('openai_api_key', apiKey.trim());
-      toast({
-        title: "API Key Saved",
-        description: "Your OpenAI API key has been saved locally.",
-      });
-    }
-  };
-
   const generateImage = async () => {
-    if (!apiKey.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter your OpenAI API key first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!prompt.trim()) {
       toast({
         title: "Error",
@@ -53,28 +32,18 @@ export const ImageGenerator = () => {
 
     setIsGenerating(true);
     try {
-      const response = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: model,
-          prompt: prompt,
-          n: 1,
-          size: size,
-          quality: quality,
-          response_format: 'url',
-        }),
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: {
+          prompt,
+          model,
+          size,
+          quality,
+          n: 1
+        }
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to generate image');
-      }
+      if (error) throw error;
 
-      const data = await response.json();
       setGeneratedImage(data.data[0].url);
       toast({
         title: "Success",
@@ -109,15 +78,6 @@ export const ImageGenerator = () => {
   };
 
   const editImage = async () => {
-    if (!apiKey.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter your OpenAI API key first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!selectedFile) {
       toast({
         title: "Error",
@@ -141,25 +101,16 @@ export const ImageGenerator = () => {
       const formData = new FormData();
       formData.append('image', selectedFile);
       formData.append('prompt', editPrompt);
-      formData.append('model', 'dall-e-2'); // Only DALL-E 2 supports editing
-      formData.append('n', '1');
+      formData.append('model', 'dall-e-2');
       formData.append('size', '1024x1024');
-      formData.append('response_format', 'url');
+      formData.append('n', '1');
 
-      const response = await fetch('https://api.openai.com/v1/images/edits', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: formData,
+      const { data, error } = await supabase.functions.invoke('edit-image', {
+        body: formData
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to edit image');
-      }
+      if (error) throw error;
 
-      const data = await response.json();
       setGeneratedImage(data.data[0].url);
       toast({
         title: "Success",
@@ -187,51 +138,6 @@ export const ImageGenerator = () => {
           Create and edit images using OpenAI's powerful AI models
         </p>
       </div>
-
-      {/* Security Warning */}
-      <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/50">
-        <AlertTriangle className="h-4 w-4 text-yellow-600" />
-        <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-          <strong>Security Notice:</strong> Your API key will be stored in your browser's local storage. 
-          For production applications, consider using a backend service to protect your API keys.
-        </AlertDescription>
-      </Alert>
-
-      {/* API Key Input */}
-      <Card>
-        <CardHeader>
-          <CardTitle>OpenAI API Configuration</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">OpenAI API Key</Label>
-            <div className="flex space-x-2">
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={saveApiKey} variant="outline">
-                Save
-              </Button>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Get your API key from{' '}
-              <a 
-                href="https://platform.openai.com/api-keys" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                OpenAI Platform
-              </a>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Main Interface */}
       <Tabs defaultValue="generate" className="w-full">
