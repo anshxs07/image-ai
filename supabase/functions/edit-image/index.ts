@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,78 +20,40 @@ serve(async (req) => {
       throw new Error("Image and prompt are required");
     }
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiApiKey) {
-      throw new Error("OpenAI API key not configured");
+    const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
+    if (!hfToken) {
+      throw new Error("Hugging Face access token not configured");
     }
 
-    // Convert image to base64
+    console.log("Editing image with prompt:", prompt);
+
+    const hf = new HfInference(hfToken);
+
+    // Convert uploaded image to the format needed for HF
     const imageBuffer = await image.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-    const mimeType = image.type;
+    const imageBlob = new Blob([imageBuffer], { type: image.type });
 
-    // Use GPT-4 Vision to analyze and generate new image based on prompt
-    const visionResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openaiApiKey}`,
-        "Content-Type": "application/json",
+    // Use instruct-pix2pix model for image editing
+    const editedImage = await hf.imageToImage({
+      inputs: imageBlob,
+      parameters: {
+        prompt: prompt,
       },
-      body: JSON.stringify({
-        model: "gpt-4.1-2025-04-14",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Analyze this image and create a detailed prompt that incorporates the following edit request: "${prompt}". Create a comprehensive description that maintains the original image's key elements while applying the requested changes.`
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64Image}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 500
-      }),
+      model: "timbrooks/instruct-pix2pix"
     });
 
-    if (!visionResponse.ok) {
-      const error = await visionResponse.json();
-      throw new Error(error.error?.message || "Failed to analyze image");
-    }
+    // Convert the result to base64
+    const resultBuffer = await editedImage.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(resultBuffer)));
 
-    const visionData = await visionResponse.json();
-    const enhancedPrompt = visionData.choices[0].message.content;
+    // Return in OpenAI-compatible format for frontend compatibility
+    const response = {
+      data: [{
+        url: `data:image/png;base64,${base64}`
+      }]
+    };
 
-    // Generate new image using the enhanced prompt
-    const generateResponse = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openaiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt: enhancedPrompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "standard"
-      }),
-    });
-
-    if (!generateResponse.ok) {
-      const error = await generateResponse.json();
-      throw new Error(error.error?.message || "Failed to generate image");
-    }
-
-    const data = await generateResponse.json();
-
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
