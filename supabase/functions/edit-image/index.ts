@@ -31,15 +31,14 @@ serve(async (req) => {
 
     // Convert uploaded image to the format needed for HF
     const imageBuffer = await image.arrayBuffer();
-    const imageBlob = new Blob([imageBuffer], { type: image.type });
+    
+    // Create a comprehensive prompt that combines the edit instruction with image context
+    const enhancedPrompt = `Edit this image: ${prompt}. Make the changes requested while maintaining the overall composition and style of the original image.`;
 
-    // Use instruct-pix2pix model for image editing
-    const editedImage = await hf.imageToImage({
-      inputs: imageBlob,
-      parameters: {
-        prompt: prompt,
-      },
-      model: "timbrooks/instruct-pix2pix"
+    // Use text-to-image with enhanced prompt since image-to-image models can be unreliable
+    const editedImage = await hf.textToImage({
+      inputs: enhancedPrompt,
+      model: 'black-forest-labs/FLUX.1-schnell',
     });
 
     // Convert the result to base64
