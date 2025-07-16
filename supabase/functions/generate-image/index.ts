@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,56 +12,38 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, model = "dall-e-3", size = "1024x1024", quality = "standard", n = 1 } = await req.json();
+    const { prompt } = await req.json();
 
     if (!prompt) {
       throw new Error("Prompt is required");
     }
 
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiApiKey) {
-      throw new Error("OpenAI API key not configured");
+    const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
+    if (!hfToken) {
+      throw new Error("Hugging Face access token not configured");
     }
 
-    // Validate size based on model
-    let validatedSize = size;
-    if (model === "dall-e-2") {
-      // DALL-E 2 only supports square sizes
-      const validSizes = ["256x256", "512x512", "1024x1024"];
-      if (!validSizes.includes(size)) {
-        validatedSize = "1024x1024"; // Default to square for DALL-E 2
-      }
-    }
+    console.log("Generating image with prompt:", prompt);
 
-    const requestBody: any = {
-      model,
-      prompt,
-      n,
-      size: validatedSize,
-    };
+    const hf = new HfInference(hfToken);
 
-    // Only add quality for DALL-E 3
-    if (model === "dall-e-3") {
-      requestBody.quality = quality;
-    }
-
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openaiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
+    const image = await hf.textToImage({
+      inputs: prompt,
+      model: 'black-forest-labs/FLUX.1-schnell',
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || "Failed to generate image");
-    }
+    // Convert the blob to a base64 string
+    const arrayBuffer = await image.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-    const data = await response.json();
+    // Return in OpenAI-compatible format for frontend compatibility
+    const response = {
+      data: [{
+        url: `data:image/png;base64,${base64}`
+      }]
+    };
 
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
