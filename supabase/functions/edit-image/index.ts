@@ -14,9 +14,6 @@ serve(async (req) => {
     const formData = await req.formData();
     const image = formData.get("image") as File;
     const prompt = formData.get("prompt") as string;
-    const model = formData.get("model") as string || "dall-e-2";
-    const size = formData.get("size") as string || "1024x1024";
-    const n = parseInt(formData.get("n") as string || "1");
 
     if (!image || !prompt) {
       throw new Error("Image and prompt are required");
@@ -27,27 +24,71 @@ serve(async (req) => {
       throw new Error("OpenAI API key not configured");
     }
 
-    const editFormData = new FormData();
-    editFormData.append("image", image);
-    editFormData.append("prompt", prompt);
-    editFormData.append("model", model);
-    editFormData.append("n", n.toString());
-    editFormData.append("size", size);
+    // Convert image to base64
+    const imageBuffer = await image.arrayBuffer();
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    const mimeType = image.type;
 
-    const response = await fetch("https://api.openai.com/v1/images/edits", {
+    // Use GPT-4 Vision to analyze and generate new image based on prompt
+    const visionResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${openaiApiKey}`,
+        "Content-Type": "application/json",
       },
-      body: editFormData,
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Analyze this image and create a detailed prompt that incorporates the following edit request: "${prompt}". Create a comprehensive description that maintains the original image's key elements while applying the requested changes.`
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 500
+      }),
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || "Failed to edit image");
+    if (!visionResponse.ok) {
+      const error = await visionResponse.json();
+      throw new Error(error.error?.message || "Failed to analyze image");
     }
 
-    const data = await response.json();
+    const visionData = await visionResponse.json();
+    const enhancedPrompt = visionData.choices[0].message.content;
+
+    // Generate new image using the enhanced prompt
+    const generateResponse = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openaiApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt: enhancedPrompt,
+        n: 1,
+        size: "1024x1024",
+        quality: "standard"
+      }),
+    });
+
+    if (!generateResponse.ok) {
+      const error = await generateResponse.json();
+      throw new Error(error.error?.message || "Failed to generate image");
+    }
+
+    const data = await generateResponse.json();
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
