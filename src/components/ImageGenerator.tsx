@@ -9,6 +9,7 @@ import { Loader2, Upload, Sparkles, Edit3, History, Image as ImageIcon } from "l
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useImageStorage } from "@/hooks/useImageStorage";
+import { useImageHistory } from "@/hooks/useImageHistory";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Link } from "react-router-dom";
 
@@ -23,6 +24,7 @@ export const ImageGenerator = () => {
   const [quality, setQuality] = useState('standard');
   const { toast } = useToast();
   const { saveImage, isUploading } = useImageStorage();
+  const { refetch: refetchImages } = useImageHistory();
 
   const generateImage = async () => {
     if (!prompt.trim()) {
@@ -59,6 +61,8 @@ export const ImageGenerator = () => {
           generationType: 'generate',
           modelUsed: model
         });
+        // Refresh the gallery after successful save
+        await refetchImages();
       } catch (saveError) {
         console.error('Error saving image:', saveError);
         // Still show success for generation even if save fails
@@ -141,6 +145,8 @@ export const ImageGenerator = () => {
           generationType: 'edit',
           modelUsed: 'dall-e-2'
         });
+        // Refresh the gallery after successful save
+        await refetchImages();
       } catch (saveError) {
         console.error('Error saving image:', saveError);
         // Still show success for editing even if save fails

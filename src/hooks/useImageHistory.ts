@@ -20,12 +20,46 @@ export const useImageHistory = () => {
   const fetchImages = async () => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
       if (userError || !user) {
-        setImages([]);
+        // For guest users, fetch recent images from storage
+        try {
+          const { data: storageData, error: storageError } = await supabase.storage
+            .from('generated-images')
+            .list('', {
+              limit: 50,
+              sortBy: { column: 'created_at', order: 'desc' }
+            });
+
+          if (storageError) throw storageError;
+
+          // Convert storage files to image format
+          const guestImages: GeneratedImage[] = (storageData || []).map((file) => {
+            const { data: urlData } = supabase.storage
+              .from('generated-images')
+              .getPublicUrl(file.name);
+            
+            return {
+              id: file.id || file.name,
+              prompt: 'Generated image', // Default since we can't get prompt from storage
+              image_url: urlData.publicUrl,
+              file_path: file.name,
+              generation_type: file.name.includes('-edit') ? 'edit' : 'generate' as 'generate' | 'edit',
+              model_used: undefined,
+              created_at: file.created_at || new Date().toISOString(),
+            };
+          });
+
+          setImages(guestImages);
+        } catch (storageError) {
+          console.error('Error fetching storage images:', storageError);
+          setImages([]);
+        }
         setIsLoading(false);
         return;
       }
 
+      // For authenticated users, fetch from database
       const { data, error } = await supabase
         .from('generated_images')
         .select('*')
