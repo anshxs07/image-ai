@@ -1,8 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
+import { Sparkles, User, LogOut } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export const Header = () => {
+  const { user, signOut } = useAuth();
+
   return (
     <header className="fixed top-0 w-full z-50 border-b border-border/40 bg-background/80 backdrop-blur-lg">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -27,27 +31,31 @@ export const Header = () => {
           </nav>
           
           <div className="flex items-center space-x-4">
-            <SignedOut>
-              <SignInButton>
-                <Button variant="ghost" size="sm">
-                  Sign In
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <User className="h-4 w-4 mr-2" />
+                    {user.email}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={signOut}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/auth">Sign In</Link>
                 </Button>
-              </SignInButton>
-              <SignUpButton>
-                <Button variant="hero" size="sm">
-                  Get Started
+                <Button variant="hero" size="sm" asChild>
+                  <Link to="/auth">Get Started</Link>
                 </Button>
-              </SignUpButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton 
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8"
-                  }
-                }}
-              />
-            </SignedIn>
+              </>
+            )}
           </div>
         </div>
       </div>

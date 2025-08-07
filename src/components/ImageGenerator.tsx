@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useImageStorage } from "@/hooks/useImageStorage";
 import { useImageHistory } from "@/hooks/useImageHistory";
 import { ImageGallery } from "@/components/ImageGallery";
+import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 
 export const ImageGenerator = () => {
@@ -25,6 +26,7 @@ export const ImageGenerator = () => {
   const { toast } = useToast();
   const { saveImage, isUploading } = useImageStorage();
   const { refetch: refetchImages } = useImageHistory();
+  const { user, trackUsage, usage } = useAuth();
 
   const generateImage = async () => {
     if (!prompt.trim()) {
