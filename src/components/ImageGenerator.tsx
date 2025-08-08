@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Upload, Sparkles, Edit3, History, Image as ImageIcon } from "lucide-react";
+import { Loader2, Upload, Sparkles, Edit3, History, Image as ImageIcon, Crown, Zap, Star, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useImageStorage } from "@/hooks/useImageStorage";
@@ -13,6 +13,8 @@ import { useImageHistory } from "@/hooks/useImageHistory";
 import { ImageGallery } from "@/components/ImageGallery";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 export const ImageGenerator = () => {
   const [prompt, setPrompt] = useState('');
@@ -26,7 +28,26 @@ export const ImageGenerator = () => {
   const { toast } = useToast();
   const { saveImage, isUploading } = useImageStorage();
   const { refetch: refetchImages } = useImageHistory();
-  const { user, trackUsage, usage } = useAuth();
+  const { user, trackUsage, usage, subscription } = useAuth();
+
+  // Plan configuration
+  const plans = [
+    { id: "free", name: "Free", icon: Star, color: "text-muted-foreground", limits: { generations: 5, edits: 5 } },
+    { id: "pro", name: "Pro", icon: Zap, color: "text-blue-500", limits: { generations: 25, edits: 25 } },
+    { id: "pro-plus", name: "Pro Plus", icon: Crown, color: "text-purple-500", limits: { generations: 500, edits: 500 } }
+  ];
+
+  const getCurrentPlan = () => {
+    if (!subscription?.subscribed) return plans[0];
+    const tierMap: Record<string, string> = {
+      "Pro": "pro",
+      "Pro Plus": "pro-plus"
+    };
+    return plans.find(plan => plan.id === tierMap[subscription.subscription_tier || ""]) || plans[0];
+  };
+
+  const currentPlan = getCurrentPlan();
+  const usagePercentage = usage?.limit ? Math.round((usage.total_usage / usage.limit) * 100) : 0;
 
   const generateImage = async () => {
     if (!prompt.trim()) {
@@ -368,8 +389,49 @@ export const ImageGenerator = () => {
           )}
         </div>
 
-        {/* Gallery Widget Sidebar */}
-        <div className="lg:col-span-1">
+        {/* Sidebar */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Current Plan Card */}
+          {user && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <currentPlan.icon className={`w-5 h-5 ${currentPlan.color}`} />
+                  Current Plan
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold">{currentPlan.name}</p>
+                    {subscription?.subscribed && (
+                      <Badge variant="default">Active</Badge>
+                    )}
+                  </div>
+                  <Link to="/plans">
+                    <Button variant="outline" size="sm">
+                      <CreditCard className="w-4 h-4 mr-1" />
+                      Manage
+                    </Button>
+                  </Link>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Usage this month</span>
+                    <span>{usage?.total_usage || 0} / {usage?.limit || 0}</span>
+                  </div>
+                  <Progress value={usagePercentage} className="h-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Generations: {usage?.generation_count || 0}</span>
+                    <span>Edits: {usage?.edit_count || 0}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Images Gallery */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
