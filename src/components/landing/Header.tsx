@@ -25,6 +25,11 @@ export const Header = () => {
             <a href="#pricing" className="text-foreground/80 hover:text-foreground transition-colors">
               Pricing
             </a>
+            {user && (
+              <Link to="/plans" className="text-foreground/80 hover:text-foreground transition-colors">
+                My Plans
+              </Link>
+            )}
             <a href="#about" className="text-foreground/80 hover:text-foreground transition-colors">
               About
             </a>
