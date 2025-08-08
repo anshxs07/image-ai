@@ -79,17 +79,19 @@ serve(async (req) => {
       logStep("Active subscription found", { subscriptionId: subscription.id, endDate: subscriptionEnd });
       
       const priceId = subscription.items.data[0].price.id;
-      const price = await stripe.prices.retrieve(priceId);
-      const amount = price.unit_amount || 0;
       
-      if (amount <= 1000) {
-        subscriptionTier = "Pro";
-      } else if (amount <= 5000) {
-        subscriptionTier = "Pro Plus";
-      } else {
-        subscriptionTier = "Enterprise";
+      // Map price IDs to subscription tiers
+      switch (priceId) {
+        case "price_1RtOe1R5hjXkJqtZ6BM47HkI":
+          subscriptionTier = "Pro";
+          break;
+        case "price_1RtOedR5hjXkJqtZNiUKd7bk":
+          subscriptionTier = "Pro Plus";
+          break;
+        default:
+          subscriptionTier = "Unknown";
       }
-      logStep("Determined subscription tier", { priceId, amount, subscriptionTier });
+      logStep("Determined subscription tier", { priceId, subscriptionTier });
     } else {
       logStep("No active subscription found");
     }
