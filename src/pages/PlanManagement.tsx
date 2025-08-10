@@ -83,11 +83,22 @@ export default function PlanManagement() {
 
     setUpgradeLoading(priceId);
     try {
+      // Map priceId to plan name that the edge function expects
+      const planMap: Record<string, string> = {
+        "price_1RtOe1R5hjXkJqtZ6BM47HkI": "pro",
+        "price_1RtOedR5hjXkJqtZNiUKd7bk": "proplus"
+      };
+      
+      const planName = planMap[priceId];
+      if (!planName) {
+        throw new Error("Invalid plan selected");
+      }
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: { priceId },
+        body: { plan: planName },
       });
 
       if (error) throw error;
