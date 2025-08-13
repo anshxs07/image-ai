@@ -5,10 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import History from "./pages/History";
-import Auth from "./pages/Auth";
+import ClerkAuth from "./pages/ClerkAuth";
 import PlanManagement from "./pages/PlanManagement";
 import NotFound from "./pages/NotFound";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/ClerkAuthContext";
 
 const queryClient = new QueryClient();
 
@@ -22,7 +22,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/history" element={<History />} />
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth" element={<ClerkAuth />} />
             <Route path="/plans" element={<PlanManagement />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

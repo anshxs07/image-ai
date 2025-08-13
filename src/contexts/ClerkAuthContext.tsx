@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SubscriptionInfo {
@@ -17,8 +17,8 @@ interface UsageInfo {
 }
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: any | null;
+  session: any | null;
   subscription: SubscriptionInfo;
   usage: UsageInfo;
   loading: boolean;
@@ -42,8 +42,8 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const { user: clerkUser, isLoaded } = useUser();
+  const { getToken, signOut: clerkSignOut } = useClerkAuth();
   const [subscription, setSubscription] = useState<SubscriptionInfo>({ subscribed: false });
   const [usage, setUsage] = useState<UsageInfo>({
     generation_count: 0,
@@ -54,11 +54,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   });
   const [loading, setLoading] = useState(true);
 
+  // Create a session-like object for compatibility
+  const session = clerkUser ? {
+    user: {
+      id: clerkUser.id,
+      email: clerkUser.emailAddresses[0]?.emailAddress,
+    },
+    access_token: null // Will be populated when needed
+  } : null;
+
   const checkSubscription = async () => {
-    if (!session) return;
+    if (!clerkUser) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
+      const token = await getToken();
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (error) throw error;
       setSubscription(data);
     } catch (error) {
@@ -67,14 +81,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const fetchUsage = async () => {
-    if (!session) return;
+    if (!clerkUser) return;
 
     try {
+      const userEmail = clerkUser.emailAddresses[0]?.emailAddress;
+      
       // Get current usage from database
       const { data: usageData, error } = await supabase
         .from('usage_tracking')
         .select('*')
-        .eq('email', session.user.email)
+        .eq('email', userEmail)
         .gte('current_period_end', new Date().toISOString())
         .single();
 
@@ -83,7 +99,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const { data: subData } = await supabase
           .from('subscribers')
           .select('*')
-          .eq('email', session.user.email)
+          .eq('email', userEmail)
           .single();
 
         let limit = 5; // Free plan default
@@ -114,10 +130,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const trackUsage = async (action: 'generate' | 'edit'): Promise<boolean> => {
-    if (!session) return false;
+    if (!clerkUser) return false;
 
     try {
+      const token = await getToken();
       const { data, error } = await supabase.functions.invoke('track-usage', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: { action }
       });
 
@@ -145,55 +165,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await clerkSignOut();
   };
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Defer Supabase calls to prevent deadlock
-        if (session?.user) {
-          setTimeout(() => {
-            checkSubscription();
-            fetchUsage();
-          }, 0);
-        } else {
-          setSubscription({ subscribed: false });
-          setUsage({
-            generation_count: 0,
-            edit_count: 0,
-            total_usage: 0,
-            limit: 5,
-            remaining: 5
-          });
-        }
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
+    if (isLoaded) {
+      if (clerkUser) {
         setTimeout(() => {
           checkSubscription();
           fetchUsage();
         }, 0);
+      } else {
+        setSubscription({ subscribed: false });
+        setUsage({
+          generation_count: 0,
+          edit_count: 0,
+          total_usage: 0,
+          limit: 5,
+          remaining: 5
+        });
       }
       setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    }
+  }, [clerkUser, isLoaded]);
 
   const value = {
-    user,
+    user: clerkUser,
     session,
     subscription,
     usage,

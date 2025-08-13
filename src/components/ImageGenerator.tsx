@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useImageStorage } from "@/hooks/useImageStorage";
 import { useImageHistory } from "@/hooks/useImageHistory";
 import { ImageGallery } from "@/components/ImageGallery";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/ClerkAuthContext";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";

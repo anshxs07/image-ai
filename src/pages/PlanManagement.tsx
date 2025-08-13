@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/ClerkAuthContext";
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -55,7 +56,8 @@ const plans = [
 ];
 
 export default function PlanManagement() {
-  const { user, session, subscription, usage, checkSubscription } = useAuth();
+  const { user, subscription, usage, checkSubscription } = useAuth();
+  const { getToken } = useClerkAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export default function PlanManagement() {
   const usagePercentage = usage?.limit ? Math.round((usage.total_usage / usage.limit) * 100) : 0;
 
   const handleUpgrade = async (priceId: string, planName: string) => {
-    if (!user || !session) {
+    if (!user) {
       toast({
         title: "Authentication required",
         description: "Please log in to upgrade your plan.",
@@ -94,9 +96,10 @@ export default function PlanManagement() {
         throw new Error("Invalid plan selected");
       }
 
+      const token = await getToken();
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: { plan: planName },
       });
@@ -123,13 +126,14 @@ export default function PlanManagement() {
   };
 
   const handleManageSubscription = async () => {
-    if (!user || !session) return;
+    if (!user) return;
 
     setLoading(true);
     try {
+      const token = await getToken();
       const { data, error } = await supabase.functions.invoke('customer-portal', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 

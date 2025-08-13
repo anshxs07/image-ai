@@ -5,7 +5,7 @@ import { Pricing } from "@/components/landing/Pricing";
 import { Footer } from "@/components/landing/Footer";
 import { ImageGenerator } from "@/components/ImageGenerator";
 import SubscriptionManager from "@/components/SubscriptionManager";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/ClerkAuthContext";
 
 const Index = () => {
   const { user } = useAuth();
