@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,32 +17,57 @@ serve(async (req) => {
       throw new Error("Prompt is required");
     }
 
-    const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
-    if (!hfToken) {
-      throw new Error("Hugging Face access token not configured");
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableApiKey) {
+      throw new Error("Lovable API key not configured");
     }
 
     console.log("Generating image with prompt:", prompt);
 
-    const hf = new HfInference(hfToken);
-
-    const image = await hf.textToImage({
-      inputs: prompt,
-      model: 'black-forest-labs/FLUX.1-schnell',
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      }),
     });
 
-    // Convert the blob to a base64 string
-    const arrayBuffer = await image.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI Gateway error:", response.status, errorText);
+      
+      if (response.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+      if (response.status === 402) {
+        throw new Error("Payment required. Please add credits to your Lovable AI workspace.");
+      }
+      
+      throw new Error(`AI Gateway error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const imageUrl = data.choices?.[0]?.message?.content;
+
+    if (!imageUrl) {
+      throw new Error("No image URL received from AI");
+    }
 
     // Return in OpenAI-compatible format for frontend compatibility
-    const response = {
+    return new Response(JSON.stringify({
       data: [{
-        url: `data:image/png;base64,${base64}`
+        url: imageUrl
       }]
-    };
-
-    return new Response(JSON.stringify(response), {
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,39 +19,76 @@ serve(async (req) => {
       throw new Error("Image and prompt are required");
     }
 
-    const hfToken = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
-    if (!hfToken) {
-      throw new Error("Hugging Face access token not configured");
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableApiKey) {
+      throw new Error("Lovable API key not configured");
     }
 
     console.log("Editing image with prompt:", prompt);
 
-    const hf = new HfInference(hfToken);
-
-    // Convert uploaded image to the format needed for HF
+    // Convert image to base64
     const imageBuffer = await image.arrayBuffer();
-    
-    // Create a comprehensive prompt that combines the edit instruction with image context
-    const enhancedPrompt = `Edit this image: ${prompt}. Make the changes requested while maintaining the overall composition and style of the original image.`;
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    const imageDataUrl = `data:${image.type};base64,${base64Image}`;
 
-    // Use text-to-image with enhanced prompt since image-to-image models can be unreliable
-    const editedImage = await hf.textToImage({
-      inputs: enhancedPrompt,
-      model: 'black-forest-labs/FLUX.1-schnell',
+    // Create enhanced prompt for editing
+    const enhancedPrompt = `Based on this image, create a new image with the following changes: ${prompt}. Maintain the overall style and composition while making the requested modifications.`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageDataUrl
+                }
+              },
+              {
+                type: "text",
+                text: enhancedPrompt
+              }
+            ]
+          }
+        ]
+      }),
     });
 
-    // Convert the result to base64
-    const resultBuffer = await editedImage.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(resultBuffer)));
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI Gateway error:", response.status, errorText);
+      
+      if (response.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+      if (response.status === 402) {
+        throw new Error("Payment required. Please add credits to your Lovable AI workspace.");
+      }
+      
+      throw new Error(`AI Gateway error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const imageUrl = data.choices?.[0]?.message?.content;
+
+    if (!imageUrl) {
+      throw new Error("No image URL received from AI");
+    }
 
     // Return in OpenAI-compatible format for frontend compatibility
-    const response = {
+    return new Response(JSON.stringify({
       data: [{
-        url: `data:image/png;base64,${base64}`
+        url: imageUrl
       }]
-    };
-
-    return new Response(JSON.stringify(response), {
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
