@@ -32,18 +32,25 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
 
+    // Decode Clerk JWT token to get user info
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    let userEmail: string;
+    let userId: string;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userEmail = payload.email;
+      userId = payload.sub || payload.user_id;
+      if (!userEmail) throw new Error("Email not found in token");
+    } catch (error) {
+      throw new Error("Invalid token or email not available");
+    }
+    logStep("User authenticated", { userId, email: userEmail });
 
     // Get current usage for this user
     const { data: existingUsage, error: usageError } = await supabaseClient
       .from("usage_tracking")
       .select("*")
-      .eq("email", user.email)
+      .eq("email", userEmail)
       .gte("current_period_end", new Date().toISOString())
       .single();
 
@@ -61,8 +68,8 @@ serve(async (req) => {
       const { data: newUsage, error: insertError } = await supabaseClient
         .from("usage_tracking")
         .insert({
-          user_id: user.id,
-          email: user.email,
+          user_id: userId,
+          email: userEmail,
           generation_count: 0,
           edit_count: 0,
           total_usage: 0,
@@ -81,7 +88,7 @@ serve(async (req) => {
     const { data: subscription, error: subError } = await supabaseClient
       .from("subscribers")
       .select("*")
-      .eq("email", user.email)
+      .eq("email", userEmail)
       .single();
 
     let limit = 5; // Free plan default

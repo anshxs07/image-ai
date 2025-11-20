@@ -34,21 +34,28 @@ serve(async (req) => {
     if (!authHeader) throw new Error("No authorization header provided");
     logStep("Authorization header found");
 
+    // Decode Clerk JWT token to get user info
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    let userEmail: string;
+    let userId: string;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userEmail = payload.email;
+      userId = payload.sub || payload.user_id;
+      if (!userEmail) throw new Error("Email not found in token");
+    } catch (error) {
+      throw new Error("Invalid token or email not available");
+    }
+    logStep("User authenticated", { userId, email: userEmail });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
     
     if (customers.data.length === 0) {
       logStep("No customer found, updating unsubscribed state");
       await supabaseClient.from("subscribers").upsert({
-        email: user.email,
-        user_id: user.id,
+        email: userEmail,
+        user_id: userId,
         stripe_customer_id: null,
         subscribed: false,
         subscription_tier: null,
@@ -97,8 +104,8 @@ serve(async (req) => {
     }
 
     await supabaseClient.from("subscribers").upsert({
-      email: user.email,
-      user_id: user.id,
+      email: userEmail,
+      user_id: userId,
       stripe_customer_id: customerId,
       subscribed: hasActiveSub,
       subscription_tier: subscriptionTier,
