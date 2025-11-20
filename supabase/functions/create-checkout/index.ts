@@ -32,11 +32,9 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     
-    // For Clerk integration, we'll decode the token differently
-    // For now, we'll extract email from the token payload
+    // Decode Clerk JWT token to get user info
     let user_email: string;
     try {
-      // Decode Clerk JWT token to get user info
       const payload = JSON.parse(atob(token.split('.')[1]));
       user_email = payload.email;
       if (!user_email) throw new Error("Email not found in token");
