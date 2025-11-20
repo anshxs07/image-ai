@@ -40,11 +40,19 @@ serve(async (req) => {
     let userId: string;
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      userEmail = payload.email;
-      userId = payload.sub || payload.user_id;
-      if (!userEmail) throw new Error("Email not found in token");
+      logStep("Token payload", payload);
+      
+      // Try different possible locations for email in Clerk JWT
+      userEmail = payload.email || payload.primaryEmailAddress || payload.email_address;
+      userId = payload.sub || payload.user_id || payload.id;
+      
+      if (!userEmail) {
+        logStep("Email not found in token payload", { payload });
+        throw new Error("Email not found in token");
+      }
     } catch (error) {
-      throw new Error("Invalid token or email not available");
+      logStep("Token decode error", { error: error.message });
+      throw new Error(`Invalid token or email not available: ${error.message}`);
     }
     logStep("User authenticated", { userId, email: userEmail });
 
