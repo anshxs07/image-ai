@@ -26,9 +26,16 @@ serve(async (req) => {
 
     console.log("Editing image with prompt:", prompt);
 
-    // Convert image to base64
+    // Convert image to base64 using chunks to avoid stack overflow
     const imageBuffer = await image.arrayBuffer();
-    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    const uint8Array = new Uint8Array(imageBuffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    const base64Image = btoa(binary);
     const imageDataUrl = `data:${image.type};base64,${base64Image}`;
 
     // Create enhanced prompt for editing
@@ -78,7 +85,6 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("AI response structure:", JSON.stringify(data, null, 2));
 
     // Extract image from Nano banana response format
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;

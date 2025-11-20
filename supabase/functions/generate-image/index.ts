@@ -57,8 +57,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("AI response structure:", JSON.stringify(data, null, 2));
-
+    
     // Extract image from Nano banana response format
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
