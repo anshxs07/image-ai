@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.customer-portal]
 verify_jwt = false
+
+[functions.generate-image]
+verify_jwt = false
+
+[functions.edit-image]
+verify_jwt = false
