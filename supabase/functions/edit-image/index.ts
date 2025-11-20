@@ -41,7 +41,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: "google/gemini-2.5-flash-image-preview",
         messages: [
           {
             role: "user",
@@ -58,7 +58,8 @@ serve(async (req) => {
               }
             ]
           }
-        ]
+        ],
+        modalities: ["image", "text"]
       }),
     });
 
@@ -77,11 +78,17 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.content;
+    console.log("AI response structure:", JSON.stringify(data, null, 2));
+
+    // Extract image from Nano banana response format
+    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!imageUrl) {
+      console.error("No image found in response. Full response:", JSON.stringify(data));
       throw new Error("No image URL received from AI");
     }
+
+    console.log("Successfully edited image");
 
     // Return in OpenAI-compatible format for frontend compatibility
     return new Response(JSON.stringify({
