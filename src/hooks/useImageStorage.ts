@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/ClerkAuthContext';
 
 interface SaveImageParams {
   imageDataUrl: string;
@@ -12,18 +13,16 @@ interface SaveImageParams {
 export const useImageStorage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const saveImage = async ({ imageDataUrl, prompt, generationType, modelUsed }: SaveImageParams) => {
     setIsUploading(true);
     try {
-      // Get current user - for now, we'll create a guest user ID since auth isn't implemented
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      let userId = user?.id;
+      // Get user ID from Clerk
+      const userId = user?.id;
       
-      // If no authenticated user, create a guest session ID for demo purposes
       if (!userId) {
-        userId = 'guest-' + Math.random().toString(36).substr(2, 9);
-        console.log('No authenticated user, using guest ID:', userId);
+        throw new Error('You must be logged in to save images');
       }
 
       let blob: Blob;
@@ -64,25 +63,21 @@ export const useImageStorage = () => {
         .from('generated-images')
         .getPublicUrl(fileName);
 
-      // Save metadata to database (only if authenticated user)
-      if (user?.id) {
-        const { error: dbError } = await supabase
-          .from('generated_images')
-          .insert({
-            user_id: user.id,
-            prompt,
-            image_url: urlData.publicUrl,
-            file_path: fileName,
-            generation_type: generationType,
-            model_used: modelUsed
-          });
+      // Save metadata to database
+      const { error: dbError } = await supabase
+        .from('generated_images')
+        .insert({
+          user_id: userId,
+          prompt,
+          image_url: urlData.publicUrl,
+          file_path: fileName,
+          generation_type: generationType,
+          model_used: modelUsed
+        });
 
-        if (dbError) {
-          console.error('Database error:', dbError);
-          // Don't throw for guest users, just log
-        }
-      } else {
-        console.log('Guest user - image saved to storage but not to database');
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw dbError;
       }
 
       toast({
