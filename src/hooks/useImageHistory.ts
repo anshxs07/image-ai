@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/ClerkAuthContext';
 
 interface GeneratedImage {
   id: string;
@@ -16,13 +17,12 @@ export const useImageHistory = () => {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const fetchImages = async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        // For guest users, show empty state
+      if (!user?.id) {
+        // For non-authenticated users, show empty state
         setImages([]);
         setIsLoading(false);
         return;
@@ -85,8 +85,13 @@ export const useImageHistory = () => {
   };
 
   useEffect(() => {
-    fetchImages();
-  }, []);
+    if (user) {
+      fetchImages();
+    } else {
+      setImages([]);
+      setIsLoading(false);
+    }
+  }, [user]);
 
   return {
     images,
