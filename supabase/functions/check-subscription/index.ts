@@ -42,13 +42,34 @@ serve(async (req) => {
       const payload = JSON.parse(atob(token.split('.')[1]));
       logStep("Token payload", payload);
       
-      // Try different possible locations for email in Clerk JWT
-      userEmail = payload.email || payload.primaryEmailAddress || payload.email_address;
+      // Get user ID from token
       userId = payload.sub || payload.user_id || payload.id;
       
+      if (!userId) {
+        throw new Error("User ID not found in token");
+      }
+      
+      // Fetch user email from Clerk API
+      const clerkSecretKey = Deno.env.get('CLERK_SECRET_KEY');
+      if (!clerkSecretKey) {
+        throw new Error('CLERK_SECRET_KEY not configured');
+      }
+      
+      const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${clerkSecretKey}`,
+        },
+      });
+      
+      if (!userResponse.ok) {
+        throw new Error(`Failed to fetch user from Clerk: ${userResponse.status}`);
+      }
+      
+      const userData = await userResponse.json();
+      userEmail = userData.email_addresses?.[0]?.email_address;
+      
       if (!userEmail) {
-        logStep("Email not found in token payload", { payload });
-        throw new Error("Email not found in token");
+        throw new Error('Email not found in Clerk user data');
       }
     } catch (error) {
       logStep("Token decode error", { error: error.message });
