@@ -61,17 +61,6 @@ export const ImageGenerator = () => {
 
     setIsGenerating(true);
     try {
-      // Track usage first
-      const canProceed = await trackUsage('generate');
-      if (!canProceed) {
-        toast({
-          title: "Usage Limit Reached",
-          description: "You've reached your monthly generation limit. Upgrade your plan to continue.",
-          variant: "destructive",
-        });
-        setIsGenerating(false);
-        return;
-      }
 
       const { data, error } = await supabase.functions.invoke('generate-image', {
         body: {
@@ -156,17 +145,6 @@ export const ImageGenerator = () => {
 
     setIsGenerating(true);
     try {
-      // Track usage first
-      const canProceed = await trackUsage('edit');
-      if (!canProceed) {
-        toast({
-          title: "Usage Limit Reached",
-          description: "You've reached your monthly edit limit. Upgrade your plan to continue.",
-          variant: "destructive",
-        });
-        setIsGenerating(false);
-        return;
-      }
 
       const formData = new FormData();
       formData.append('image', selectedFile);
